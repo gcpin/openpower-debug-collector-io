@@ -27,3 +27,36 @@ executable('dump-collect',
     implicit_include_directories: true,
     install: true
 )
+
+bindir = get_option('bindir')
+dreport_include_dir = join_paths(get_option('datadir'), 'dreport.d/include.d')
+dreport_plugins_dir = join_paths(get_option('datadir'), 'dreport.d/plugins.d')
+
+scripts_to_install_bindir = []
+scripts_to_install_pluginsdir = []
+include_scripts = []
+
+subdir('tools')
+# Install collected files if any
+if scripts_to_install_bindir.length() > 0
+    install_data(scripts_to_install_bindir,
+        install_dir: get_option('bindir'),
+        install_mode: 'rwxr-xr-x'
+    )
+endif
+
+# Install collected include scripts if any
+if scripts_to_install_pluginsdir.length() > 0
+    install_data(scripts_to_install_pluginsdir,
+        install_dir: dreport_plugins_dir,
+        install_mode: 'rwxr-xr-x'
+    )
+endif
+
+# Install collected include scripts if any
+if include_scripts.length() > 0
+    install_data(include_scripts,
+        install_dir: dreport_include_dir,
+        install_mode: 'rwxr-xr-x'
+    )
+endif
