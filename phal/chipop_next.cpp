@@ -59,20 +59,26 @@ uint32_t DumpData::size() const
 DumpData getDump(targeting::TargetHandle chip, uint8_t dumpType,
                  uint8_t clockState, uint8_t collectFastArray)
 {
-    std::vector<sbei::ResponseInfo::FFDC> ffdc;
     std::vector<uint8_t> dumpData;
 
-    // Call dump module wrapper - handles target conversion internally
-    auto rc = hostfw::dump::getDump(chip, dumpType, clockState,
-                                    collectFastArray, dumpData, ffdc);
-    if (rc != 0)
+    // Call dump module wrapper - handles target conversion and FFDC internally
+    // Returns errl::ErrlHandleOpt (std::nullopt on success)
+    auto errl = hostfw::dump::getDump(chip, dumpType, clockState,
+                                      collectFastArray, dumpData);
+
+    // Check if error occurred (errl will have a value if there was an error)
+    if (errl)
     {
-        std::string msg = "getDump failed with RC=" + std::to_string(rc);
-        if (!ffdc.empty())
-        {
-            msg += ", FFDC count=" + std::to_string(ffdc.size());
-        }
-        throw ChipOpError(ChipOpError::Type::Failed, msg);
+        // Error log was created internally by hostfw::dump::getDump
+        throw ChipOpError(ChipOpError::Type::Failed,
+                          "getDump failed - error log created");
+    }
+
+    // Verify data was collected
+    if (dumpData.empty())
+    {
+        throw ChipOpError(ChipOpError::Type::Failed,
+                          "getDump failed - no data collected");
     }
 
     lg2::info("PHAL Next: getDump collected {SIZE} bytes", "SIZE",
