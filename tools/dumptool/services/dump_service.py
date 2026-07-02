@@ -1,6 +1,7 @@
-from dumptool.clients.dbus_client import DBusClient
-from dumptool.models import DumpType, DumpInfo
 from typing import List
+
+from dumptool.clients.dbus_client import DBusClient
+from dumptool.models import DumpInfo, DumpType
 
 
 class DumpService:

@@ -418,8 +418,9 @@ void SbeDumpCollector::collectDumpFromSBE(
         auto dumpData =
             phal_chipop::getDump(chip, type, clockState, collectFastArray);
 
+        auto nodeNum = phal_tgt::getNodeNum(chip);
         // Pass byte span directly — no extra copy needed
-        writeDumpFile(path, id, clockState, 0, chipName, chipPos,
+        writeDumpFile(path, id, clockState, nodeNum, chipName, chipPos,
                       dumpData.bytes());
     }
     catch (const phal_chipop::ChipOpError& chipOpError)

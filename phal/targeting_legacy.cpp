@@ -86,6 +86,11 @@ uint32_t chipPos(TargetHandle target)
     return pdbg_target_index(target);
 }
 
+uint32_t getNodeNum(TargetHandle target)
+{
+    return 0;
+}
+
 ChipType getChipType(TargetHandle target)
 {
     if (is_ody_ocmb_chip(target))

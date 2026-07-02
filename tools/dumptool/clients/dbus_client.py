@@ -1,17 +1,17 @@
-import subprocess
 import datetime
-from typing import List, Dict
-from dumptool.models import DumpEntry, DumpType, DumpInfo
+import subprocess
+from typing import Dict, List, Optional
+
+from dumptool.models import DumpEntry, DumpInfo, DumpType
+
 
 class DBusClient:
     BUSNAME = "xyz.openbmc_project.Dump.Manager"
 
-    #List Dumps
+    # List Dumps
     def list_dumps(self) -> List[DumpEntry]:
         result = subprocess.run(
-            ["busctl", "tree", self.BUSNAME],
-            capture_output=True,
-            text=True
+            ["busctl", "tree", self.BUSNAME], capture_output=True, text=True
         )
 
         dumps = []
@@ -28,7 +28,7 @@ class DBusClient:
                         DumpEntry(
                             id=dump_id,
                             type=DumpType.from_path(path),
-                            object_path=path
+                            object_path=path,
                         )
                     )
                 except ValueError:
@@ -36,54 +36,58 @@ class DBusClient:
 
         return dumps
 
-    #Create Dump
+    # Create Dump
     def create_dump(self, dump_type: DumpType, params: Dict = {}) -> str:
         result = subprocess.run(
             [
-                "busctl", "call",
+                "busctl",
+                "call",
                 self.BUSNAME,
                 dump_type.object_path,
                 "xyz.openbmc_project.Dump.Create",
                 "CreateDump",
-                "a{sv}", "0"
+                "a{sv}",
+                "0",
             ],
             capture_output=True,
-            text=True
+            text=True,
         )
 
         print("STDOUT:", result.stdout)
         return result.stdout.strip()
 
-    #Delete Dump
+    # Delete Dump
     def delete_dump(self, object_path: str) -> bool:
         result = subprocess.run(
             [
-                "busctl", "call",
+                "busctl",
+                "call",
                 self.BUSNAME,
                 object_path,
                 "xyz.openbmc_project.Object.Delete",
-                "Delete"
+                "Delete",
             ],
             capture_output=True,
-            text=True
+            text=True,
         )
 
         return result.returncode == 0
 
-    #Get Dump Info
+    # Get Dump Info
     def get_dump_info(self, object_path: str) -> DumpInfo:
 
         def get_property(prop, interface):
             result = subprocess.run(
                 [
-                    "busctl", "get-property",
+                    "busctl",
+                    "get-property",
                     self.BUSNAME,
                     object_path,
                     interface,
-                    prop
+                    prop,
                 ],
                 capture_output=True,
-                text=True
+                text=True,
             )
 
             if result.returncode != 0:
@@ -112,7 +116,7 @@ class DBusClient:
                 dt = datetime.datetime.utcfromtimestamp(ts)
 
                 return dt.strftime("%Y-%m-%d %H:%M:%S")
-            except:
+            except (TypeError, ValueError, OSError, OverflowError):
                 return str(value)
 
         def parse_status(status_raw):
@@ -124,14 +128,30 @@ class DBusClient:
                 return False
             return None
 
+        def as_int(value) -> Optional[int]:
+            return (
+                value
+                if isinstance(value, int) and not isinstance(value, bool)
+                else None
+            )
 
-        size = get_property("Size", "xyz.openbmc_project.Dump.Entry")
-        offloaded = get_property("Offloaded", "xyz.openbmc_project.Dump.Entry")
+        def as_bool(value) -> Optional[bool]:
+            return value if isinstance(value, bool) else None
 
-        started_time_raw = get_property("StartTime", "xyz.openbmc_project.Common.Progress")
-        ended_time_raw = get_property("CompletedTime", "xyz.openbmc_project.Common.Progress")
-        status_raw = get_property("Status", "xyz.openbmc_project.Common.Progress")
+        size = as_int(get_property("Size", "xyz.openbmc_project.Dump.Entry"))
+        offloaded = as_bool(
+            get_property("Offloaded", "xyz.openbmc_project.Dump.Entry")
+        )
 
+        started_time_raw = get_property(
+            "StartTime", "xyz.openbmc_project.Common.Progress"
+        )
+        ended_time_raw = get_property(
+            "CompletedTime", "xyz.openbmc_project.Common.Progress"
+        )
+        status_raw = get_property(
+            "Status", "xyz.openbmc_project.Common.Progress"
+        )
 
         completed = parse_status(status_raw)
         started_time = format_time(started_time_raw)
@@ -147,5 +167,5 @@ class DBusClient:
             completed=completed,
             offloaded=offloaded,
             started_time=started_time,
-            ended_time=ended_time
+            ended_time=ended_time,
         )
