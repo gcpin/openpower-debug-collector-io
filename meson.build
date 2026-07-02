@@ -66,13 +66,11 @@ if phal_backend == 'next'
     )
     
     python.install_sources(
-        'tools/dumptool/clients/__init__.py',
         'tools/dumptool/clients/dbus_client.py',
         subdir: 'dumptool/clients',
     )
     
     python.install_sources(
-        'tools/dumptool/services/__init__.py',
         'tools/dumptool/services/dump_service.py',
         subdir: 'dumptool/services',
     )
