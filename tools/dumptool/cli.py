@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 import argparse
-from dumptool.services.dump_service import DumpService
+
 from dumptool.models import DumpType
+from dumptool.services.dump_service import DumpService
 
 service = DumpService()
 
@@ -9,7 +10,9 @@ service = DumpService()
 def list_dumps(filter_type):
     dumps = service.list_dumps()
 
-    print(f"{'ID':<10} {'Type':<12} {'Size(KB)':<12} {'Start Time':<20} {'End Time':<20} {'Status':<15}")
+    print(
+        f"{'ID':<10} {'Type':<12} {'Size(KB)':<12} {'Start Time':<20} {'End Time':<20} {'Status':<15}"
+    )
 
     for d in dumps:
         if filter_type and d.type.value != filter_type:
@@ -18,7 +21,9 @@ def list_dumps(filter_type):
         size_kb = d.size_kb
         status = d.status
 
-        print(f"{d.id:<10} {d.final_type:<12} {size_kb:<12} {str(d.started_time or '-'): <20} {str(d.ended_time or '-'): <20} {status:<15}")
+        print(
+            f"{d.id:<10} {d.final_type:<12} {size_kb:<12} {str(d.started_time or '-'): <20} {str(d.ended_time or '-'): <20} {status:<15}"
+        )
 
 
 def create_dump(dump_type):
@@ -64,7 +69,11 @@ def main():
 
     # create
     create_parser = subparsers.add_parser("create", help="Create a dump")
-    create_parser.add_argument("--type", default="bmc", help="Dump type (accepted values: bmc, system, resource, faultlog)")
+    create_parser.add_argument(
+        "--type",
+        default="bmc",
+        help="Dump type (accepted values: bmc, system, resource, faultlog)",
+    )
 
     # delete
     delete_parser = subparsers.add_parser("delete", help="Delete a dump")

@@ -55,7 +55,7 @@ endif
 # Install dumptool Python package for phal-next backend
 if phal_backend == 'next'
     python = import('python').find_installation('python3')
-    
+
     # Install the dumptool package
     python.install_sources(
         'tools/dumptool/__init__.py',
@@ -64,17 +64,17 @@ if phal_backend == 'next'
         'tools/dumptool/models.py',
         subdir: 'dumptool',
     )
-    
+
     python.install_sources(
         'tools/dumptool/clients/dbus_client.py',
         subdir: 'dumptool/clients',
     )
-    
+
     python.install_sources(
         'tools/dumptool/services/dump_service.py',
         subdir: 'dumptool/services',
     )
-    
+
     # Create wrapper script in /usr/bin
     configure_file(
         input: 'tools/dumptool-wrapper.sh',
