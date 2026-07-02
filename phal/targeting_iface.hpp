@@ -117,6 +117,17 @@ bool isUsable(TargetHandle target);
 uint32_t chipPos(TargetHandle target);
 
 /**
+ * @brief Get node number
+ *
+ * Legacy: 0
+ * Next: getParentTarget's ATTR_FAPI_POS via utils::getFapiPos()
+ *
+ * @param target Target handle
+ * @return Node number
+ */
+uint32_t getNodeNum(TargetHandle target);
+
+/**
  * @brief Get target chip type (semantic classification)
  *
  * Legacy: is_ody_ocmb_chip() to classify

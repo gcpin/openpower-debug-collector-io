@@ -122,8 +122,33 @@ uint32_t chipPos(TargetHandle target)
 
     try
     {
-        // Get FAPI position (matches failingUnit semantics)
         return TARGETING::utils::getPosition(target);
+    }
+    catch (const std::exception& ex)
+    {
+        lg2::error("PHAL Next: chipPos failed: {ERROR}", "ERROR", ex.what());
+        return 0;
+    }
+}
+
+uint32_t getNodeNum(TargetHandle target)
+{
+    if (target == nullptr)
+    {
+        return 0;
+    }
+
+    auto parentTarget =
+        TARGETING::utils::getParentTarget(target, TARGETING::TYPE_NODE);
+    if (parentTarget == nullptr)
+    {
+        return 0;
+    }
+
+    try
+    {
+        // Get FAPI position (matches failingUnit semantics)
+        return TARGETING::utils::getFapiPos(parentTarget);
     }
     catch (const std::exception& ex)
     {
