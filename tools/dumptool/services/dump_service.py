@@ -12,10 +12,19 @@ class DumpService:
         dumps = self.client.list_dumps()
         return [self.client.get_dump_info(d.object_path) for d in dumps]
 
-    def create_dump(self, dump_type: DumpType) -> str:
-        return self.client.create_dump(dump_type)
+    def create_dump(
+        self,
+        dump_type: DumpType,
+        error_log_id=None,
+        failing_unit_id=None,
+    ) -> str:
+        return self.client.create_dump(
+            dump_type,
+            error_log_id,
+            failing_unit_id,
+        )
 
-    def delete_dump(self, dump_id: int) -> bool:
+    def delete_dump(self, dump_id: str) -> bool:
         dumps = self.client.list_dumps()
         dump = next((d for d in dumps if d.id == dump_id), None)
 
@@ -24,8 +33,9 @@ class DumpService:
 
         return self.client.delete_dump(dump.object_path)
 
-    def get_dump_info(self, dump_id: int) -> DumpInfo:
+    def get_dump_info(self, dump_id: str) -> DumpInfo:
         dumps = self.client.list_dumps()
+
         dump = next((d for d in dumps if d.id == dump_id), None)
 
         if not dump:

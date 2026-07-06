@@ -1,6 +1,6 @@
 import datetime
 import subprocess
-from typing import Dict, List, Optional
+from typing import List
 
 from dumptool.models import DumpEntry, DumpInfo, DumpType
 
@@ -11,7 +11,9 @@ class DBusClient:
     # List Dumps
     def list_dumps(self) -> List[DumpEntry]:
         result = subprocess.run(
-            ["busctl", "tree", self.BUSNAME], capture_output=True, text=True
+            ["busctl", "tree", self.BUSNAME],
+            capture_output=True,
+            text=True,
         )
 
         dumps = []
@@ -22,24 +24,28 @@ class DBusClient:
             if "/xyz/openbmc_project/dump/" in line and "/entry/" in line:
                 path = line.split()[-1]
 
-                try:
-                    dump_id = int(path.split("/")[-1])
-                    dumps.append(
-                        DumpEntry(
-                            id=dump_id,
-                            type=DumpType.from_path(path),
-                            object_path=path,
-                        )
+                dump_id = path.split("/")[-1]
+
+                dumps.append(
+                    DumpEntry(
+                        id=dump_id,
+                        type=DumpType.from_path(path),
+                        object_path=path,
                     )
-                except ValueError:
-                    continue
+                )
 
         return dumps
 
     # Create Dump
-    def create_dump(self, dump_type: DumpType, params: Dict = {}) -> str:
-        result = subprocess.run(
-            [
+    def create_dump(
+        self,
+        dump_type: DumpType,
+        error_log_id=None,
+        failing_unit_id=None,
+    ) -> str:
+
+        if dump_type == DumpType.BMC:
+            cmd = [
                 "busctl",
                 "call",
                 self.BUSNAME,
@@ -48,12 +54,47 @@ class DBusClient:
                 "CreateDump",
                 "a{sv}",
                 "0",
-            ],
+            ]
+        else:
+            error_id = error_log_id if error_log_id is not None else 0xDEADBEEF
+
+            failing_id = failing_unit_id if failing_unit_id is not None else 1
+
+            subtype_map = {
+                DumpType.HOSTBOOT: "Hostboot",
+                DumpType.HARDWARE: "Hardware",
+                DumpType.SBE: "SBE",
+            }
+
+            cmd = [
+                "busctl",
+                "call",
+                self.BUSNAME,
+                "/xyz/openbmc_project/dump/system",
+                "xyz.openbmc_project.Dump.Create",
+                "CreateDump",
+                "a{sv}",
+                "3",
+                "com.ibm.Dump.Create.CreateParameters.DumpType",
+                "s",
+                f"com.ibm.Dump.Create.DumpType.{subtype_map[dump_type]}",
+                "com.ibm.Dump.Create.CreateParameters.ErrorLogId",
+                "t",
+                str(error_id),
+                "com.ibm.Dump.Create.CreateParameters.FailingUnitId",
+                "t",
+                str(failing_id),
+            ]
+
+        result = subprocess.run(
+            cmd,
             capture_output=True,
             text=True,
         )
 
-        print("STDOUT:", result.stdout)
+        if result.returncode != 0:
+            raise RuntimeError(result.stderr.strip() or result.stdout.strip())
+
         return result.stdout.strip()
 
     # Delete Dump
@@ -102,67 +143,100 @@ class DBusClient:
 
             if dtype == "b":
                 return value.lower() == "true"
+
             elif dtype in ["u", "t", "x"]:
                 return int(value)
+
             else:
                 return value
 
         def format_time(value):
             if not value or value == 0:
                 return None
+
             try:
                 ts = int(value) / 1_000_000
-
                 dt = datetime.datetime.utcfromtimestamp(ts)
-
                 return dt.strftime("%Y-%m-%d %H:%M:%S")
-            except (TypeError, ValueError, OSError, OverflowError):
+
+            except Exception:
                 return str(value)
 
         def parse_status(status_raw):
             if not status_raw:
                 return None
+
             if "Completed" in status_raw:
                 return True
+
             elif "InProgress" in status_raw:
                 return False
+
             return None
 
-        def as_int(value) -> Optional[int]:
-            return (
-                value
-                if isinstance(value, int) and not isinstance(value, bool)
-                else None
+        def get_subtype():
+
+            result = subprocess.run(
+                [
+                    "busctl",
+                    "introspect",
+                    self.BUSNAME,
+                    object_path,
+                ],
+                capture_output=True,
+                text=True,
             )
 
-        def as_bool(value) -> Optional[bool]:
-            return value if isinstance(value, bool) else None
+            output = result.stdout
 
-        size = as_int(get_property("Size", "xyz.openbmc_project.Dump.Entry"))
-        offloaded = as_bool(
-            get_property("Offloaded", "xyz.openbmc_project.Dump.Entry")
+            if "com.ibm.Dump.Entry.Hardware" in output:
+                return "hardware"
+
+            if "com.ibm.Dump.Entry.Hostboot" in output:
+                return "hostboot"
+
+            if "com.ibm.Dump.Entry.SBE" in output:
+                return "sbe"
+
+            return DumpType.from_path(object_path).value
+
+        size = get_property(
+            "Size",
+            "xyz.openbmc_project.Dump.Entry",
+        )
+
+        offloaded = get_property(
+            "Offloaded",
+            "xyz.openbmc_project.Dump.Entry",
         )
 
         started_time_raw = get_property(
-            "StartTime", "xyz.openbmc_project.Common.Progress"
+            "StartTime",
+            "xyz.openbmc_project.Common.Progress",
         )
+
         ended_time_raw = get_property(
-            "CompletedTime", "xyz.openbmc_project.Common.Progress"
+            "CompletedTime",
+            "xyz.openbmc_project.Common.Progress",
         )
+
         status_raw = get_property(
-            "Status", "xyz.openbmc_project.Common.Progress"
+            "Status",
+            "xyz.openbmc_project.Common.Progress",
         )
 
         completed = parse_status(status_raw)
         started_time = format_time(started_time_raw)
         ended_time = format_time(ended_time_raw)
 
-        dump_id = int(object_path.split("/")[-1])
+        dump_id = object_path.split("/")[-1]
         dump_type = DumpType.from_path(object_path)
+        subtype = get_subtype()
 
         return DumpInfo(
             id=dump_id,
             type=dump_type,
+            subtype=subtype,
             size=size,
             completed=completed,
             offloaded=offloaded,

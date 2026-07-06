@@ -28,11 +28,10 @@ issues. However, managing these dumps traditionally requires:
 ### What it does
 
 - **List dumps**: View all dumps or filter by type with formatted output
-- **Create dumps**: Generate BMC, system, resource, or faultlog dumps on demand
+- **Create dumps**: Generate BMC, hostboot, hardware, or SBE dumps on demand
 - **Query dumps**: Get detailed information about specific dumps
 - **Delete dumps**: Clean up old or unnecessary dumps
 - **Smart categorization**: Automatically identifies hostboot and SBE dumps
-  based on ID ranges
 
 ## Usage
 
@@ -59,18 +58,23 @@ List all dumps or filter by type.
 dumptool list [--type TYPE]
 ```
 
-- `--type`: Optional filter (bmc, system, resource, faultlog)
+- `--type`: Optional filter. Accepted values: `bmc`, `system`, `hostboot`,
+  `hardware`, `sbe`
 
 ### create
 
 Create a new dump.
 
 ```bash
-dumptool create [--type TYPE]
+dumptool create --type TYPE [--error-id ERROR_ID] [--failing-id FAILING_UNIT_ID]
 ```
 
-- `--type`: Dump type to create (default: bmc)
-  - Accepted values: bmc, system, resource, faultlog
+- `--type`: **Required**. Dump type to create. Accepted values: `bmc`,
+  `hostboot`, `hardware`, `sbe`
+- `--error-id`: Error Log ID (required for `hardware`; optional for `hostboot`
+  and `sbe`). Accepts decimal or hex (e.g. `0xDEADBEEF`).
+- `--failing-id`: Failing Unit ID (required for `sbe`; optional for `hardware`).
+  Integer.
 
 ### delete
 
@@ -80,7 +84,7 @@ Delete a dump by ID.
 dumptool delete DUMP_ID
 ```
 
-- `DUMP_ID`: Numeric ID of the dump to delete
+- `DUMP_ID`: ID of the dump to delete
 
 ### get-info
 
@@ -90,7 +94,7 @@ Get detailed information about a specific dump.
 dumptool get-info DUMP_ID
 ```
 
-- `DUMP_ID`: Numeric ID of the dump
+- `DUMP_ID`: ID of the dump
 
 ## Examples
 
@@ -100,30 +104,59 @@ Display general help:
 
 ```bash
 $ dumptool --help
-usage: dumptool [-h] {list,create,delete,get-info} ...
+usage: dumptool [-h] <command> ...
 
-Dump Management Tool
+OpenBMC Dump Management Tool
 
-positional arguments:
-  {list,create,delete,get-info}
-    list                List all dumps
-    create              Create a dump
-    delete              Delete a dump
-    get-info            Get dump details
+Supported dump types:
+  bmc
+  hostboot
+  hardware
+  sbe
 
-optional arguments:
-  -h, --help            show this help message and exit
+Commands:
+  list                List available dumps
+  create              Create a dump
+  delete              Delete a dump
+  get-info            Show dump information
+
+Examples:
+  dumptool list
+  dumptool list --type bmc
+  dumptool list --type hostboot
+  dumptool list --type hardware
+  dumptool list --type sbe
+
+  dumptool create --type bmc
+  dumptool create --type hostboot
+  dumptool create --type hardware --error-id <ERROR_ID>
+  dumptool create --type sbe --failing-id <FAILING_UNIT_ID>
+
+  dumptool get-info <DUMP_ID>
+  dumptool delete <DUMP_ID>
+
+Placeholders:
+  <ERROR_ID>         Error Log ID (e.g. 0xDEADBEEF)
+  <FAILING_UNIT_ID>  Failing Unit ID (e.g. 1)
+  <DUMP_ID>          Dump ID
 ```
 
 Get help for the create command:
 
 ```bash
 $ dumptool create --help
-usage: dumptool create [-h] [--type TYPE]
+usage: dumptool create [-h] --type {bmc,hostboot,hardware,sbe}
+                       [--error-id ERROR_ID] [--failing-id FAILING_ID]
 
-optional arguments:
-  -h, --help   show this help message and exit
-  --type TYPE  Dump type (accepted values: bmc, system, resource, faultlog)
+Create a new dump.
+
+options:
+  -h, --help            show this help message and exit
+  --type {bmc,hostboot,hardware,sbe}
+                        Type of dump to create.
+  --error-id ERROR_ID   Error Log ID (required for hardware, optional for hostboot and sbe).
+  --failing-id FAILING_ID
+                        Failing Unit ID (required for sbe, optional for hardware).
 ```
 
 ### Listing Dumps
@@ -146,7 +179,7 @@ ID         Type         Size(KB)     Start Time           End Time             S
 1          bmc          256 KB       2024-04-27 10:30:00  2024-04-27 10:30:05  Completed
 ```
 
-List only system dumps:
+List only system dumps (includes hostboot, hardware, and SBE subtypes):
 
 ```bash
 $ dumptool list --type system
@@ -157,32 +190,42 @@ ID         Type         Size(KB)     Start Time           End Time             S
 
 ### Creating Dumps
 
-Create a BMC dump (default):
+Create a BMC dump:
 
 ```bash
-$ dumptool create
+$ dumptool create --type bmc
 ✔ Dump created successfully
+Dump ID : 1
 ```
 
-Create a system dump:
+Create a hostboot dump:
 
 ```bash
-$ dumptool create --type system
+$ dumptool create --type hostboot
 ✔ Dump created successfully
+Dump ID : 20000001
 ```
 
-Create a resource dump:
-
 ```bash
-$ dumptool create --type resource
+$ dumptool create --type hardware --error-id 0xDEADBEEF
 ✔ Dump created successfully
+Dump ID : 20000002
 ```
 
-Create a faultlog dump:
+```bash
+$ dumptool create --type sbe --failing-id 1
+✔ Dump created successfully
+Dump ID : 30000001
+```
+
+Omitting required arguments prints an error:
 
 ```bash
-$ dumptool create --type faultlog
-✔ Dump created successfully
+$ dumptool create --type hardware
+✖ Hardware dump requires --error-id
+
+$ dumptool create --type sbe
+✖ SBE dump requires --failing-id
 ```
 
 ### Getting Dump Information
@@ -247,6 +290,14 @@ dumptool list --type bmc
 dumptool get-info <DUMP_ID>
 ```
 
+Create and verify a hardware dump:
+
+```bash
+dumptool create --type hardware --error-id 0xDEADBEEF
+dumptool list --type system
+dumptool get-info <DUMP_ID>
+```
+
 Clean up old dumps:
 
 ```bash
@@ -259,5 +310,5 @@ dumptool delete 2
 
 - Python 3.6 or later
 - busctl (systemd)
-- OpenBMC system with phal-next backend
+- OpenBMC system with IBM dump extensions
 - D-Bus system bus access
