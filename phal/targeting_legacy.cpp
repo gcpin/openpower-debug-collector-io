@@ -86,7 +86,7 @@ uint32_t chipPos(TargetHandle target)
     return pdbg_target_index(target);
 }
 
-uint32_t getNodeNum(TargetHandle target)
+uint32_t getNodeNum([[maybe_unused]] TargetHandle target)
 {
     return 0;
 }
