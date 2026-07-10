@@ -9,8 +9,20 @@ class DumpType(Enum):
     RESOURCE = "resource"
     FAULTLOG = "faultlog"
 
+    # IBM dump types
+    HOSTBOOT = "hostboot"
+    HARDWARE = "hardware"
+    SBE = "sbe"
+
     @property
     def object_path(self) -> str:
+        if self in (
+            DumpType.HOSTBOOT,
+            DumpType.HARDWARE,
+            DumpType.SBE,
+        ):
+            return "/xyz/openbmc_project/dump/system"
+
         return f"/xyz/openbmc_project/dump/{self.value}"
 
     @staticmethod
@@ -29,28 +41,19 @@ class DumpType(Enum):
 
 @dataclass
 class DumpEntry:
-    id: int
+    id: str
     type: DumpType
     object_path: str
-
-    @property
-    def final_type(self) -> str:
-        if self.type == DumpType.BMC:
-            return "bmc"
-        if self.type == DumpType.SYSTEM:
-            if self.id >= 30000000:
-                return "sbe"
-            elif self.id >= 20000000:
-                return "hostboot"
-            else:
-                return "system"
-        return self.type.value
 
 
 @dataclass
 class DumpInfo:
-    id: int
+    id: str
     type: DumpType
+
+    # Actual subtype determined from IBM D-Bus interface
+    subtype: Optional[str] = None
+
     size: Optional[int] = None
     completed: Optional[bool] = None
     offloaded: Optional[bool] = None
@@ -58,16 +61,9 @@ class DumpInfo:
     ended_time: Optional[str] = None
 
     @property
-    def final_type(self) -> str:
-        if self.type == DumpType.BMC:
-            return "bmc"
-        if self.type == DumpType.SYSTEM:
-            if self.id >= 30000000:
-                return "sbe"
-            elif self.id >= 20000000:
-                return "hostboot"
-            else:
-                return "system"
+    def final_type(self):
+        if self.subtype:
+            return self.subtype
         return self.type.value
 
     @property
