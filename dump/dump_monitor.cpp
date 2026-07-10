@@ -56,6 +56,24 @@ void DumpMonitor::executeCollectionScript(
         args.push_back(std::to_string(failingUnitId));
     }
 
+    // For SBE BootFailure dumps
+    auto sbeTriggerTypeIt = properties.find("SBEDumpTriggerType");
+    if (sbeTriggerTypeIt != properties.end())
+    {
+        std::string triggerType =
+            std::get<std::string>(sbeTriggerTypeIt->second);
+        args.push_back("-b");
+        args.push_back(triggerType);
+    }
+
+    auto dumpFilesPathIt = properties.find("DumpFilesPath");
+    if (dumpFilesPathIt != properties.end())
+    {
+        std::string filesPath = std::get<std::string>(dumpFilesPathIt->second);
+        args.push_back("-p");
+        args.push_back(filesPath);
+    }
+
     std::vector<char*> argv;
     for (auto& arg : args)
     {
