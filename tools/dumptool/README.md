@@ -1,314 +1,259 @@
 # dumptool
 
-A Python command-line tool for managing OpenBMC dumps on systems using the
-phal-next backend.
-
-## Overview
-
-`dumptool` simplifies dump management on OpenBMC systems by providing an
-intuitive command-line interface for common dump operations.
-
-### Why dumptool?
-
-On OpenBMC systems, dumps are critical for debugging hardware and firmware
-issues. However, managing these dumps traditionally requires:
-
-- Complex D-Bus commands with lengthy object paths
-- Knowledge of specific D-Bus interfaces and methods
-- Manual parsing of D-Bus output
-
-`dumptool` addresses these challenges by:
-
-- **Simplifying Operations**: Single commands replace complex D-Bus calls
-- **Improving Usability**: Clear, formatted output instead of raw D-Bus data
-- **Reducing Errors**: Type validation and helpful error messages
-- **Saving Time**: Quick access to dump information without memorizing D-Bus
-  paths
-
-### What it does
-
-- **List dumps**: View all dumps or filter by type with formatted output
-- **Create dumps**: Generate BMC, hostboot, hardware, or SBE dumps on demand
-- **Query dumps**: Get detailed information about specific dumps
-- **Delete dumps**: Clean up old or unnecessary dumps
-- **Smart categorization**: Automatically identifies hostboot and SBE dumps
-
-## Usage
-
-```bash
-dumptool <command> [options]
-```
-
-## Commands
-
-### help
-
-Display help information.
-
-```bash
-dumptool --help
-dumptool -h
-```
-
-### list
-
-List all dumps or filter by type.
-
-```bash
-dumptool list [--type TYPE]
-```
-
-- `--type`: Optional filter. Accepted values: `bmc`, `system`, `hostboot`,
-  `hardware`, `sbe`
-
-### create
-
-Create a new dump.
-
-```bash
-dumptool create --type TYPE [--error-id ERROR_ID] [--failing-id FAILING_UNIT_ID]
-```
-
-- `--type`: **Required**. Dump type to create. Accepted values: `bmc`,
-  `hostboot`, `hardware`, `sbe`
-- `--error-id`: Error Log ID (required for `hardware`; optional for `hostboot`
-  and `sbe`). Accepts decimal or hex (e.g. `0xDEADBEEF`).
-- `--failing-id`: Failing Unit ID (required for `sbe`; optional for `hardware`).
-  Integer.
-
-### delete
-
-Delete a dump by ID.
-
-```bash
-dumptool delete DUMP_ID
-```
-
-- `DUMP_ID`: ID of the dump to delete
-
-### get-info
-
-Get detailed information about a specific dump.
-
-```bash
-dumptool get-info DUMP_ID
-```
-
-- `DUMP_ID`: ID of the dump
-
-## Examples
-
-### Getting Help
-
-Display general help:
-
-```bash
-$ dumptool --help
-usage: dumptool [-h] <command> ...
-
-OpenBMC Dump Management Tool
-
-Supported dump types:
-  bmc
-  hostboot
-  hardware
-  sbe
-
-Commands:
-  list                List available dumps
-  create              Create a dump
-  delete              Delete a dump
-  get-info            Show dump information
-
-Examples:
-  dumptool list
-  dumptool list --type bmc
-  dumptool list --type hostboot
-  dumptool list --type hardware
-  dumptool list --type sbe
-
-  dumptool create --type bmc
-  dumptool create --type hostboot
-  dumptool create --type hardware --error-id <ERROR_ID>
-  dumptool create --type sbe --failing-id <FAILING_UNIT_ID>
-
-  dumptool get-info <DUMP_ID>
-  dumptool delete <DUMP_ID>
-
-Placeholders:
-  <ERROR_ID>         Error Log ID (e.g. 0xDEADBEEF)
-  <FAILING_UNIT_ID>  Failing Unit ID (e.g. 1)
-  <DUMP_ID>          Dump ID
-```
-
-Get help for the create command:
-
-```bash
-$ dumptool create --help
-usage: dumptool create [-h] --type {bmc,hostboot,hardware,sbe}
-                       [--error-id ERROR_ID] [--failing-id FAILING_ID]
-
-Create a new dump.
-
-options:
-  -h, --help            show this help message and exit
-  --type {bmc,hostboot,hardware,sbe}
-                        Type of dump to create.
-  --error-id ERROR_ID   Error Log ID (required for hardware, optional for hostboot and sbe).
-  --failing-id FAILING_ID
-                        Failing Unit ID (required for sbe, optional for hardware).
-```
-
-### Listing Dumps
-
-List all dumps:
-
-```bash
-$ dumptool list
-ID         Type         Size(KB)     Start Time           End Time             Status
-1          bmc          256 KB       2024-04-27 10:30:00  2024-04-27 10:30:05  Completed
-20000001   hostboot     512 KB       2024-04-27 11:00:00  2024-04-27 11:00:10  Completed
-30000001   sbe          128 KB       2024-04-27 12:00:00  2024-04-27 12:00:03  Completed
-```
-
-List only BMC dumps:
-
-```bash
-$ dumptool list --type bmc
-ID         Type         Size(KB)     Start Time           End Time             Status
-1          bmc          256 KB       2024-04-27 10:30:00  2024-04-27 10:30:05  Completed
-```
-
-List only system dumps (includes hostboot, hardware, and SBE subtypes):
-
-```bash
-$ dumptool list --type system
-ID         Type         Size(KB)     Start Time           End Time             Status
-20000001   hostboot     512 KB       2024-04-27 11:00:00  2024-04-27 11:00:10  Completed
-30000001   sbe          128 KB       2024-04-27 12:00:00  2024-04-27 12:00:03  Completed
-```
-
-### Creating Dumps
-
-Create a BMC dump:
-
-```bash
-$ dumptool create --type bmc
-✔ Dump created successfully
-Dump ID : 1
-```
-
-Create a hostboot dump:
-
-```bash
-$ dumptool create --type hostboot
-✔ Dump created successfully
-Dump ID : 20000001
-```
-
-```bash
-$ dumptool create --type hardware --error-id 0xDEADBEEF
-✔ Dump created successfully
-Dump ID : 20000002
-```
-
-```bash
-$ dumptool create --type sbe --failing-id 1
-✔ Dump created successfully
-Dump ID : 30000001
-```
-
-Omitting required arguments prints an error:
-
-```bash
-$ dumptool create --type hardware
-✖ Hardware dump requires --error-id
-
-$ dumptool create --type sbe
-✖ SBE dump requires --failing-id
-```
-
-### Getting Dump Information
-
-Get details for a specific dump:
-
-```bash
-$ dumptool get-info 1
-ID           : 1
-Type         : bmc
-Size (KB)    : 256 KB
-Start Time   : 2024-04-27 10:30:00
-End Time     : 2024-04-27 10:30:05
-Status       : Completed
-Offloaded    : False
-```
-
-Get details for a hostboot dump:
-
-```bash
-$ dumptool get-info 20000001
-ID           : 20000001
-Type         : hostboot
-Size (KB)    : 512 KB
-Start Time   : 2024-04-27 11:00:00
-End Time     : 2024-04-27 11:00:10
-Status       : Completed
-Offloaded    : False
-```
-
-### Deleting Dumps
-
-Delete a dump by ID:
-
-```bash
-$ dumptool delete 1
-Dump deleted successfully
-```
-
-Delete multiple dumps:
-
-```bash
-$ dumptool delete 1
-Dump deleted successfully
-$ dumptool delete 2
-Dump deleted successfully
-```
-
-## Common Workflows
-
-Check for recent dumps:
-
-```bash
-dumptool list
-```
-
-Create and verify a BMC dump:
-
-```bash
-dumptool create --type bmc
-dumptool list --type bmc
-dumptool get-info <DUMP_ID>
-```
-
-Create and verify a hardware dump:
-
-```bash
-dumptool create --type hardware --error-id 0xDEADBEEF
-dumptool list --type system
-dumptool get-info <DUMP_ID>
-```
-
-Clean up old dumps:
-
-```bash
-dumptool list
-dumptool delete 1
-dumptool delete 2
-```
+`dumptool` is an operator-facing command-line interface for managing OpenBMC
+dumps through `xyz.openbmc_project.Dump.Manager`. It is installed when
+`openpower-debug-collector` is built with `-Dphal_backend=next`.
+
+The tool can:
+
+- list and filter dump entries;
+- create BMC, hostboot, hardware, and SBE dumps;
+- wait for dump collection to finish;
+- show general and dump-type-specific diagnostic properties;
+- delete individual dump entries;
+- produce table or JSON output; and
+- diagnose installation and D-Bus availability problems.
 
 ## Requirements
 
-- Python 3.6 or later
-- busctl (systemd)
-- OpenBMC system with IBM dump extensions
-- D-Bus system bus access
+- Python 3.7 or later
+- `busctl` from systemd
+- access to the OpenBMC system bus
+- `xyz.openbmc_project.Dump.Manager`
+- IBM dump interfaces for hostboot, hardware, and SBE dump operations
+
+## First checks on a system
+
+Verify which executable and Python package are being loaded before creating a
+dump:
+
+```bash
+type -a dumptool
+dumptool --version
+dumptool doctor
+```
+
+`doctor` is read-only. It reports the dumptool and Python versions, loaded
+`cli.py` path, `busctl` path, supported creation types, dump-manager
+reachability, and number of discovered entries.
+
+Expected version output for this implementation:
+
+```text
+dumptool 1.1.0
+```
+
+## Command summary
+
+```text
+dumptool list [OPTIONS]
+dumptool create --type TYPE [TYPE OPTIONS] [--wait] [--timeout SECONDS]
+dumptool get-info DUMP_ID [--output table|json]
+dumptool delete DUMP_ID
+dumptool doctor
+```
+
+Use `dumptool --help` or `dumptool COMMAND --help` for the complete current
+interface. Help text is generated from the same creation contract used for
+runtime validation.
+
+## Creating dumps
+
+Creation parameters are deliberately strict:
+
+| Type | Required parameters |
+| --- | --- |
+| `bmc` | None |
+| `hostboot` | `--error-id` |
+| `hardware` | `--error-id` and `--failing-id` |
+| `sbe` | `--error-id` and `--failing-id` |
+
+`--error-id` is the real PEL/error-log ID associated with the failure. Do not
+use illustrative values such as `0xDEADBEEF` for a real diagnostic dump.
+`--failing-id` is the failing unit's FAPI position. Both options accept decimal
+or `0x`-prefixed hexadecimal integers and are validated as unsigned 64-bit
+values.
+
+Examples:
+
+```bash
+dumptool create --type bmc
+
+dumptool create --type hostboot \
+    --error-id 0x1234ABCD
+
+dumptool create --type hardware \
+    --error-id 0x1234ABCD \
+    --failing-id 1
+
+dumptool create --type sbe \
+    --error-id 0x1234ABCD \
+    --failing-id 1
+```
+
+The command returns after the dump manager accepts the request. Add `--wait`
+to wait for `Completed`, `Failed`, or `Aborted`:
+
+```bash
+dumptool create --type hardware \
+    --error-id 0x1234ABCD \
+    --failing-id 1 \
+    --wait \
+    --timeout 600
+```
+
+The default wait timeout is 300 seconds. `--timeout` is rejected unless
+`--wait` is also specified. A failed, aborted, or timed-out collection returns
+a nonzero exit status.
+
+For machine-readable output:
+
+```bash
+dumptool create --type bmc --output json
+dumptool create --type hardware \
+    --error-id 0x1234ABCD \
+    --failing-id 1 \
+    --wait \
+    --output json
+```
+
+## Listing dumps
+
+```bash
+dumptool list
+dumptool list --type bmc
+dumptool list --type system
+dumptool list --type sbe
+dumptool list --latest
+dumptool list --latest 5
+dumptool list --sort start --reverse
+dumptool list --output json
+```
+
+Supported list filters are `bmc`, `system`, `resource`, `faultlog`, `hostboot`,
+`hardware`, `sbe`, `memory-buffer-sbe`, and `unknown`.
+
+The `system` filter includes generic system entries and system-manager subtypes,
+including hostboot, hardware, SBE, memory-buffer SBE, and resource entries.
+Unknown future entry families remain visible as `unknown` instead of aborting
+the complete listing.
+
+Available sort fields are `id`, `type`, `size`, `start`, `end`, and `status`.
+`--latest [COUNT]` sorts by start time and cannot be combined with `--sort`.
+
+## Inspecting a dump
+
+```bash
+dumptool get-info 30000001
+dumptool get-info 30000001 --output json
+```
+
+Where available, detailed output includes:
+
+- D-Bus object path
+- byte size and UTC timestamps
+- display and raw operation status
+- offload state and URI
+- error-log ID
+- failing-unit ID
+- SBE trigger type
+- pre-collected dump-files path
+
+## Deleting a dump
+
+```bash
+dumptool delete 30000001
+```
+
+Deletion removes the D-Bus entry and associated dump data and cannot be undone.
+The command reports success only after the D-Bus `Delete` method succeeds.
+
+## Exit status
+
+| Status | Meaning |
+| --- | --- |
+| `0` | Operation succeeded |
+| `1` | D-Bus, timeout, collection, or other operational failure |
+| `2` | Invalid command combination or dump request |
+
+Errors are written to stderr. Successful JSON remains isolated on stdout for
+scripts.
+
+## Troubleshooting an older installation
+
+These messages identify the initial dumptool implementation:
+
+```text
+usage: cli.py [-h] {list,create,delete,get-info} ...
+cli.py: error: unrecognized arguments: --error-id ... --failing-id ...
+'hardware' is not a valid DumpType
+```
+
+That installation supports only the older `bmc`, `system`, `resource`, and
+`faultlog` model. Update the image or package to a revision containing the
+current dumptool implementation. If the image should already be current, run:
+
+```bash
+dumptool doctor
+python3 -c 'import dumptool.cli as c, dumptool.models as m; print(c.__file__); print([item.value for item in m.DumpType])'
+```
+
+The module path reveals stale or shadowing Python installations. On an
+`opkg`-based image, the owning package can also be checked with:
+
+```bash
+opkg search /usr/bin/dumptool
+```
+
+Do not use the old `--type system` command as a substitute for a hardware,
+hostboot, or SBE request; it does not provide the required IBM dump parameters.
+
+## On-BMC smoke test
+
+Start with read-only checks:
+
+```bash
+dumptool --version
+dumptool doctor
+dumptool list
+dumptool list --output json
+```
+
+Then inspect an existing ID from the list:
+
+```bash
+dumptool get-info DUMP_ID
+dumptool get-info DUMP_ID --output json
+```
+
+Only on a system where dump creation is safe, create a BMC dump and wait for
+completion:
+
+```bash
+dumptool create --type bmc --wait --timeout 600
+```
+
+Hardware, hostboot, and SBE smoke tests must use valid platform diagnostic IDs.
+
+## Development and tests
+
+From the repository root:
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 \
+PYTHONPATH=tools \
+python3 -m unittest discover -s tools/dumptool/tests -v
+```
+
+For source-tree CLI testing:
+
+```bash
+PYTHONPATH=tools ./tools/dumptool-wrapper.sh --help
+```
+
+When configured with `-Dphal_backend=next`, Meson registers the same suite as
+`dumptool-unit-tests`:
+
+```bash
+meson test -C build --suite dumptool --print-errorlogs
+```
