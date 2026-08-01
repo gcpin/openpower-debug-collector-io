@@ -324,6 +324,8 @@ class DBusClient:
             offload_uri=offload_uri,
             started_time=started_time,
             ended_time=ended_time,
+            started_time_us=started_time_raw,
+            ended_time_us=ended_time_raw,
             operation_status=status_raw,
             error_log_id=error_log_id,
             failing_unit_id=failing_unit_id,
