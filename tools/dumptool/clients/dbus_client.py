@@ -12,20 +12,52 @@ from dumptool.models import (
 )
 
 
+class DBusError(RuntimeError):
+    """An actionable failure while communicating with D-Bus through busctl."""
+
+
 class DBusClient:
     BUSNAME = "xyz.openbmc_project.Dump.Manager"
+    DEFAULT_TIMEOUT = 30
+
+    def __init__(self, timeout=DEFAULT_TIMEOUT):
+        self.timeout = timeout
+
+    def _run_busctl(self, command, action):
+        try:
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=self.timeout,
+            )
+        except FileNotFoundError as error:
+            raise DBusError(
+                "busctl was not found; install systemd busctl before using dumptool"
+            ) from error
+        except subprocess.TimeoutExpired as error:
+            raise DBusError(
+                f"{action} timed out after {self.timeout} seconds"
+            ) from error
+
+        if result.returncode != 0:
+            detail = result.stderr.strip() or result.stdout.strip()
+            if not detail:
+                detail = f"busctl exited with status {result.returncode}"
+            raise DBusError(f"{action} failed: {detail}")
+
+        return result.stdout.strip()
 
     # List Dumps
     def list_dumps(self) -> List[DumpEntry]:
-        result = subprocess.run(
+        output = self._run_busctl(
             ["busctl", "tree", self.BUSNAME],
-            capture_output=True,
-            text=True,
+            "List dumps",
         )
 
         dumps = []
 
-        for line in result.stdout.strip().split("\n"):
+        for line in output.splitlines():
             line = line.strip()
 
             if "/xyz/openbmc_project/dump/" in line and "/entry/" in line:
@@ -92,24 +124,15 @@ class DBusClient:
         for key, signature, value in parameters:
             cmd.extend((key, signature, value))
 
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-        )
-
-        if result.returncode != 0:
-            raise RuntimeError(result.stderr.strip() or result.stdout.strip())
-
-        output = shlex.split(result.stdout.strip())
+        output = shlex.split(self._run_busctl(cmd, "Create dump"))
         if len(output) != 2 or output[0] != "o" or not output[1].startswith("/"):
-            raise RuntimeError("CreateDump returned an invalid object path")
+            raise DBusError("Create dump failed: invalid object path in response")
 
         return output[1]
 
     # Delete Dump
     def delete_dump(self, object_path: str) -> bool:
-        result = subprocess.run(
+        self._run_busctl(
             [
                 "busctl",
                 "call",
@@ -118,17 +141,16 @@ class DBusClient:
                 "xyz.openbmc_project.Object.Delete",
                 "Delete",
             ],
-            capture_output=True,
-            text=True,
+            f"Delete dump {object_path.rsplit('/', 1)[-1]}",
         )
 
-        return result.returncode == 0
+        return True
 
     # Get Dump Info
     def get_dump_info(self, object_path: str) -> DumpInfo:
 
         def get_property(prop, interface):
-            result = subprocess.run(
+            output_raw = self._run_busctl(
                 [
                     "busctl",
                     "get-property",
@@ -137,14 +159,10 @@ class DBusClient:
                     interface,
                     prop,
                 ],
-                capture_output=True,
-                text=True,
+                f"Read {prop} for dump {object_path.rsplit('/', 1)[-1]}",
             )
 
-            if result.returncode != 0:
-                return None
-
-            output = result.stdout.strip().split()
+            output = output_raw.split()
 
             if len(output) < 2:
                 return None
@@ -185,19 +203,15 @@ class DBusClient:
             return None
 
         def get_subtype():
-
-            result = subprocess.run(
+            output = self._run_busctl(
                 [
                     "busctl",
                     "introspect",
                     self.BUSNAME,
                     object_path,
                 ],
-                capture_output=True,
-                text=True,
+                f"Inspect dump {object_path.rsplit('/', 1)[-1]}",
             )
-
-            output = result.stdout
 
             if "com.ibm.Dump.Entry.Hardware" in output:
                 return "hardware"

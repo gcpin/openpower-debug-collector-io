@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 
 import argparse
+import sys
 
 from dumptool.models import (
     DUMP_CREATE_SPECS,
     DumpType,
     validate_create_parameters,
 )
+from dumptool.clients.dbus_client import DBusError
 from dumptool.services.dump_service import DumpService
 
 service = DumpService()
@@ -34,53 +36,39 @@ def list_dumps(filter_type):
 
 
 def create_dump(dump_type, error_id, failing_id):
-    try:
-        dump_type = DumpType(dump_type)
-        validate_create_parameters(dump_type, error_id, failing_id)
+    dump_type = DumpType(dump_type)
+    validate_create_parameters(dump_type, error_id, failing_id)
 
-        result = service.create_dump(
-            dump_type,
-            error_log_id=error_id,
-            failing_unit_id=failing_id,
-        )
+    result = service.create_dump(
+        dump_type,
+        error_log_id=error_id,
+        failing_unit_id=failing_id,
+    )
 
-        dump_id = result.rsplit("/", 1)[-1]
+    dump_id = result.rsplit("/", 1)[-1]
 
-        print("✔ Dump created successfully")
-        print(f"Dump ID : {dump_id}")
-
-    except ValueError as e:
-        print(f"✖ {e}")
-
-    except Exception as e:
-        print(f"✖ Failed to create dump: {e}")
+    print("✔ Dump created successfully")
+    print(f"Dump ID : {dump_id}")
 
 
 def delete_dump(dump_id):
-    try:
-        service.delete_dump(dump_id)
-        print("Dump deleted successfully")
-    except ValueError:
-        print("Dump not found")
+    service.delete_dump(dump_id)
+    print("Dump deleted successfully")
 
 
 def get_dump_info(dump_id):
-    try:
-        info = service.get_dump_info(dump_id)
+    info = service.get_dump_info(dump_id)
 
-        print(f"ID           : {info.id}")
-        print(f"Type         : {info.final_type}")
-        print(f"Size (KB)    : {info.size_kb}")
-        print(f"Start Time   : {info.started_time or 'N/A'}")
-        print(f"End Time     : {info.ended_time or 'N/A'}")
-        print(f"Status       : {info.status}")
-        print(f"Offloaded    : {info.offloaded}")
-
-    except ValueError:
-        print("✖ Dump not found")
+    print(f"ID           : {info.id}")
+    print(f"Type         : {info.final_type}")
+    print(f"Size (KB)    : {info.size_kb}")
+    print(f"Start Time   : {info.started_time or 'N/A'}")
+    print(f"End Time     : {info.ended_time or 'N/A'}")
+    print(f"Status       : {info.status}")
+    print(f"Offloaded    : {info.offloaded}")
 
 
-def main():
+def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="dumptool",
         description="""
@@ -120,6 +108,7 @@ Placeholders:
         dest="command",
         title="Commands",
         metavar="<command>",
+        required=True,
     )
 
     # ---------------- LIST ----------------
@@ -195,27 +184,36 @@ Placeholders:
         help="Dump ID.",
     )
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
-    if args.command == "list":
-        list_dumps(args.type)
+    try:
+        if args.command == "list":
+            list_dumps(args.type)
 
-    elif args.command == "create":
-        create_dump(
-            args.type,
-            args.error_id,
-            args.failing_id,
-        )
+        elif args.command == "create":
+            create_dump(
+                args.type,
+                args.error_id,
+                args.failing_id,
+            )
 
-    elif args.command == "delete":
-        delete_dump(args.dump_id)
+        elif args.command == "delete":
+            delete_dump(args.dump_id)
 
-    elif args.command == "get-info":
-        get_dump_info(args.dump_id)
+        elif args.command == "get-info":
+            get_dump_info(args.dump_id)
+    except ValueError as error:
+        print(f"dumptool: invalid request: {error}", file=sys.stderr)
+        return 2
+    except DBusError as error:
+        print(f"dumptool: {error}", file=sys.stderr)
+        return 1
+    except Exception as error:
+        print(f"dumptool: unexpected failure: {error}", file=sys.stderr)
+        return 1
 
-    else:
-        parser.print_help()
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
