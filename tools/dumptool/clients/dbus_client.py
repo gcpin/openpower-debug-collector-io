@@ -1,4 +1,5 @@
 import datetime
+import re
 import shlex
 import subprocess
 from typing import List
@@ -19,6 +20,9 @@ class DBusError(RuntimeError):
 class DBusClient:
     BUSNAME = "xyz.openbmc_project.Dump.Manager"
     DEFAULT_TIMEOUT = 30
+    ENTRY_PATTERN = re.compile(
+        r"(/xyz/openbmc_project/dump/[^/\s]+/entry/[^/\s]+)$"
+    )
 
     def __init__(self, timeout=DEFAULT_TIMEOUT):
         self.timeout = timeout
@@ -56,22 +60,25 @@ class DBusClient:
         )
 
         dumps = []
+        seen_paths = set()
 
         for line in output.splitlines():
-            line = line.strip()
+            match = self.ENTRY_PATTERN.search(line.strip())
+            if not match:
+                continue
 
-            if "/xyz/openbmc_project/dump/" in line and "/entry/" in line:
-                path = line.split()[-1]
+            path = match.group(1)
+            if path in seen_paths:
+                continue
+            seen_paths.add(path)
 
-                dump_id = path.split("/")[-1]
-
-                dumps.append(
-                    DumpEntry(
-                        id=dump_id,
-                        type=DumpType.from_path(path),
-                        object_path=path,
-                    )
+            dumps.append(
+                DumpEntry(
+                    id=path.rsplit("/", 1)[-1],
+                    type=DumpType.from_path(path),
+                    object_path=path,
                 )
+            )
 
         return dumps
 
@@ -148,21 +155,35 @@ class DBusClient:
 
     # Get Dump Info
     def get_dump_info(self, object_path: str) -> DumpInfo:
+        dump_id = object_path.rsplit("/", 1)[-1]
 
-        def get_property(prop, interface):
-            output_raw = self._run_busctl(
-                [
-                    "busctl",
-                    "get-property",
-                    self.BUSNAME,
-                    object_path,
-                    interface,
-                    prop,
-                ],
-                f"Read {prop} for dump {object_path.rsplit('/', 1)[-1]}",
-            )
+        def get_property(prop, interface, optional=False):
+            try:
+                output_raw = self._run_busctl(
+                    [
+                        "busctl",
+                        "get-property",
+                        self.BUSNAME,
+                        object_path,
+                        interface,
+                        prop,
+                    ],
+                    f"Read {prop} for dump {dump_id}",
+                )
+            except DBusError as error:
+                missing_property_errors = (
+                    "UnknownProperty",
+                    "UnknownInterface",
+                    "Unknown property",
+                    "Interface not found",
+                )
+                if optional and any(
+                    marker in str(error) for marker in missing_property_errors
+                ):
+                    return None
+                raise
 
-            output = output_raw.split()
+            output = shlex.split(output_raw)
 
             if len(output) < 2:
                 return None
@@ -172,8 +193,8 @@ class DBusClient:
             if dtype == "b":
                 return value.lower() == "true"
 
-            elif dtype in ["u", "t", "x"]:
-                return int(value)
+            elif dtype in ["u", "t", "x", "i"]:
+                return int(value, 0)
 
             else:
                 return value
@@ -185,44 +206,41 @@ class DBusClient:
             try:
                 ts = int(value) / 1_000_000
                 dt = datetime.datetime.utcfromtimestamp(ts)
-                return dt.strftime("%Y-%m-%d %H:%M:%S")
+                return dt.strftime("%Y-%m-%d %H:%M:%SZ")
 
             except Exception:
                 return str(value)
 
-        def parse_status(status_raw):
-            if not status_raw:
-                return None
-
-            if "Completed" in status_raw:
-                return True
-
-            elif "InProgress" in status_raw:
-                return False
-
-            return None
-
-        def get_subtype():
-            output = self._run_busctl(
-                [
-                    "busctl",
-                    "introspect",
-                    self.BUSNAME,
-                    object_path,
-                ],
-                f"Inspect dump {object_path.rsplit('/', 1)[-1]}",
-            )
-
-            if "com.ibm.Dump.Entry.Hardware" in output:
+        def get_subtype(introspection):
+            if "com.ibm.Dump.Entry.Hardware" in introspection:
                 return "hardware"
 
-            if "com.ibm.Dump.Entry.Hostboot" in output:
+            if "com.ibm.Dump.Entry.Hostboot" in introspection:
                 return "hostboot"
 
-            if "com.ibm.Dump.Entry.SBE" in output:
+            if "com.ibm.Dump.Entry.SBE" in introspection:
+                try:
+                    prefix = int(dump_id, 16) & 0xF0000000
+                except ValueError:
+                    prefix = None
+                if prefix == 0x40000000:
+                    return "memory-buffer-sbe"
                 return "sbe"
 
+            if "com.ibm.Dump.Entry.Resource" in introspection:
+                return "resource"
+
             return DumpType.from_path(object_path).value
+
+        introspection = self._run_busctl(
+            [
+                "busctl",
+                "introspect",
+                self.BUSNAME,
+                object_path,
+            ],
+            f"Inspect dump {dump_id}",
+        )
 
         size = get_property(
             "Size",
@@ -232,6 +250,12 @@ class DBusClient:
         offloaded = get_property(
             "Offloaded",
             "xyz.openbmc_project.Dump.Entry",
+        )
+
+        offload_uri = get_property(
+            "OffloadUri",
+            "xyz.openbmc_project.Dump.Entry",
+            optional=True,
         )
 
         started_time_raw = get_property(
@@ -249,21 +273,60 @@ class DBusClient:
             "xyz.openbmc_project.Common.Progress",
         )
 
-        completed = parse_status(status_raw)
         started_time = format_time(started_time_raw)
         ended_time = format_time(ended_time_raw)
 
-        dump_id = object_path.split("/")[-1]
         dump_type = DumpType.from_path(object_path)
-        subtype = get_subtype()
+        subtype = get_subtype(introspection)
+
+        error_log_id = None
+        failing_unit_id = None
+        dump_files_path = None
+        sbe_dump_trigger_type = None
+        subtype_interfaces = {
+            "hostboot": "com.ibm.Dump.Entry.Hostboot",
+            "hardware": "com.ibm.Dump.Entry.Hardware",
+            "sbe": "com.ibm.Dump.Entry.SBE",
+            "memory-buffer-sbe": "com.ibm.Dump.Entry.SBE",
+        }
+        subtype_interface = subtype_interfaces.get(subtype)
+        if subtype_interface:
+            error_log_id = get_property(
+                "ErrorLogId",
+                subtype_interface,
+                optional=True,
+            )
+        if subtype in ("hardware", "sbe", "memory-buffer-sbe"):
+            failing_unit_id = get_property(
+                "FailingUnitId",
+                subtype_interface,
+                optional=True,
+            )
+        if subtype in ("sbe", "memory-buffer-sbe"):
+            dump_files_path = get_property(
+                "DumpFilesPath",
+                subtype_interface,
+                optional=True,
+            )
+            sbe_dump_trigger_type = get_property(
+                "SBEDumpTriggerType",
+                subtype_interface,
+                optional=True,
+            )
 
         return DumpInfo(
             id=dump_id,
             type=dump_type,
             subtype=subtype,
+            object_path=object_path,
             size=size,
-            completed=completed,
             offloaded=offloaded,
+            offload_uri=offload_uri,
             started_time=started_time,
             ended_time=ended_time,
+            operation_status=status_raw,
+            error_log_id=error_log_id,
+            failing_unit_id=failing_unit_id,
+            dump_files_path=dump_files_path,
+            sbe_dump_trigger_type=sbe_dump_trigger_type,
         )

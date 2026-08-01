@@ -13,6 +13,8 @@ class DumpType(Enum):
     HOSTBOOT = "hostboot"
     HARDWARE = "hardware"
     SBE = "sbe"
+    MEMORY_BUFFER_SBE = "memory-buffer-sbe"
+    UNKNOWN = "unknown"
 
     @property
     def object_path(self) -> str:
@@ -20,6 +22,7 @@ class DumpType(Enum):
             DumpType.HOSTBOOT,
             DumpType.HARDWARE,
             DumpType.SBE,
+            DumpType.MEMORY_BUFFER_SBE,
         ):
             return "/xyz/openbmc_project/dump/system"
 
@@ -35,8 +38,7 @@ class DumpType(Enum):
             return DumpType.RESOURCE
         elif "/dump/faultlog/" in path:
             return DumpType.FAULTLOG
-        else:
-            raise ValueError("Unknown dump type")
+        return DumpType.UNKNOWN
 
 
 @dataclass(frozen=True)
@@ -112,12 +114,18 @@ class DumpInfo:
 
     # Actual subtype determined from IBM D-Bus interface
     subtype: Optional[str] = None
+    object_path: Optional[str] = None
 
     size: Optional[int] = None
-    completed: Optional[bool] = None
     offloaded: Optional[bool] = None
+    offload_uri: Optional[str] = None
     started_time: Optional[str] = None
     ended_time: Optional[str] = None
+    operation_status: Optional[str] = None
+    error_log_id: Optional[int] = None
+    failing_unit_id: Optional[int] = None
+    dump_files_path: Optional[str] = None
+    sbe_dump_trigger_type: Optional[str] = None
 
     @property
     def final_type(self):
@@ -127,10 +135,19 @@ class DumpInfo:
 
     @property
     def size_kb(self):
-        return f"{self.size // 1024} KB" if self.size else "-"
+        return f"{self.size // 1024} KB" if self.size is not None else "-"
 
     @property
     def status(self):
-        if self.completed is None:
+        if not self.operation_status:
             return "Unknown"
-        return "Completed" if self.completed else "In Progress"
+
+        raw_status = self.operation_status.rsplit(".", 1)[-1]
+        status_names = {
+            "NotStarted": "Not Started",
+            "InProgress": "In Progress",
+            "Completed": "Completed",
+            "Failed": "Failed",
+            "Aborted": "Aborted",
+        }
+        return status_names.get(raw_status, raw_status)

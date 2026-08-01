@@ -22,8 +22,14 @@ def list_dumps(filter_type):
     )
 
     for d in dumps:
-        if filter_type and d.final_type != filter_type:
-            continue
+        if filter_type:
+            matches_subtype = d.final_type == filter_type
+            matches_system_family = (
+                filter_type == DumpType.SYSTEM.value
+                and d.type == DumpType.SYSTEM
+            )
+            if not matches_subtype and not matches_system_family:
+                continue
 
         print(
             f"{d.id:<10} "
@@ -61,11 +67,22 @@ def get_dump_info(dump_id):
 
     print(f"ID           : {info.id}")
     print(f"Type         : {info.final_type}")
+    print(f"Object Path  : {info.object_path or 'N/A'}")
     print(f"Size (KB)    : {info.size_kb}")
     print(f"Start Time   : {info.started_time or 'N/A'}")
     print(f"End Time     : {info.ended_time or 'N/A'}")
     print(f"Status       : {info.status}")
+    print(f"Raw Status   : {info.operation_status or 'N/A'}")
     print(f"Offloaded    : {info.offloaded}")
+    print(f"Offload URI  : {info.offload_uri or 'N/A'}")
+    if info.error_log_id is not None:
+        print(f"Error Log ID : 0x{info.error_log_id:08X} ({info.error_log_id})")
+    if info.failing_unit_id is not None:
+        print(f"Failing Unit : {info.failing_unit_id}")
+    if info.sbe_dump_trigger_type is not None:
+        print(f"SBE Trigger  : {info.sbe_dump_trigger_type}")
+    if info.dump_files_path is not None:
+        print(f"Files Path   : {info.dump_files_path}")
 
 
 def main(argv=None):
@@ -123,9 +140,13 @@ Placeholders:
         choices=[
             "bmc",
             "system",
+            "resource",
+            "faultlog",
             "hostboot",
             "hardware",
             "sbe",
+            "memory-buffer-sbe",
+            "unknown",
         ],
         help="Filter dumps by type.",
     )
