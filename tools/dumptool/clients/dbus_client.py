@@ -1,8 +1,15 @@
 import datetime
+import shlex
 import subprocess
 from typing import List
 
-from dumptool.models import DumpEntry, DumpInfo, DumpType
+from dumptool.models import (
+    DUMP_CREATE_SPECS,
+    DumpEntry,
+    DumpInfo,
+    DumpType,
+    validate_create_parameters,
+)
 
 
 class DBusClient:
@@ -43,48 +50,47 @@ class DBusClient:
         error_log_id=None,
         failing_unit_id=None,
     ) -> str:
+        validate_create_parameters(dump_type, error_log_id, failing_unit_id)
+        spec = DUMP_CREATE_SPECS[dump_type]
 
-        if dump_type == DumpType.BMC:
-            cmd = [
-                "busctl",
-                "call",
-                self.BUSNAME,
-                dump_type.object_path,
-                "xyz.openbmc_project.Dump.Create",
-                "CreateDump",
-                "a{sv}",
-                "0",
-            ]
-        else:
-            error_id = error_log_id if error_log_id is not None else 0xDEADBEEF
+        parameters = []
+        if spec.dbus_type is not None:
+            parameters.append(
+                (
+                    "com.ibm.Dump.Create.CreateParameters.DumpType",
+                    "s",
+                    f"com.ibm.Dump.Create.DumpType.{spec.dbus_type}",
+                )
+            )
+        if error_log_id is not None:
+            parameters.append(
+                (
+                    "com.ibm.Dump.Create.CreateParameters.ErrorLogId",
+                    "t",
+                    str(error_log_id),
+                )
+            )
+        if failing_unit_id is not None:
+            parameters.append(
+                (
+                    "com.ibm.Dump.Create.CreateParameters.FailingUnitId",
+                    "t",
+                    str(failing_unit_id),
+                )
+            )
 
-            failing_id = failing_unit_id if failing_unit_id is not None else 1
-
-            subtype_map = {
-                DumpType.HOSTBOOT: "Hostboot",
-                DumpType.HARDWARE: "Hardware",
-                DumpType.SBE: "SBE",
-            }
-
-            cmd = [
-                "busctl",
-                "call",
-                self.BUSNAME,
-                "/xyz/openbmc_project/dump/system",
-                "xyz.openbmc_project.Dump.Create",
-                "CreateDump",
-                "a{sv}",
-                "3",
-                "com.ibm.Dump.Create.CreateParameters.DumpType",
-                "s",
-                f"com.ibm.Dump.Create.DumpType.{subtype_map[dump_type]}",
-                "com.ibm.Dump.Create.CreateParameters.ErrorLogId",
-                "t",
-                str(error_id),
-                "com.ibm.Dump.Create.CreateParameters.FailingUnitId",
-                "t",
-                str(failing_id),
-            ]
+        cmd = [
+            "busctl",
+            "call",
+            self.BUSNAME,
+            dump_type.object_path,
+            "xyz.openbmc_project.Dump.Create",
+            "CreateDump",
+            "a{sv}",
+            str(len(parameters)),
+        ]
+        for key, signature, value in parameters:
+            cmd.extend((key, signature, value))
 
         result = subprocess.run(
             cmd,
@@ -95,7 +101,11 @@ class DBusClient:
         if result.returncode != 0:
             raise RuntimeError(result.stderr.strip() or result.stdout.strip())
 
-        return result.stdout.strip()
+        output = shlex.split(result.stdout.strip())
+        if len(output) != 2 or output[0] != "o" or not output[1].startswith("/"):
+            raise RuntimeError("CreateDump returned an invalid object path")
+
+        return output[1]
 
     # Delete Dump
     def delete_dump(self, object_path: str) -> bool:

@@ -2,7 +2,11 @@
 
 import argparse
 
-from dumptool.models import DumpType
+from dumptool.models import (
+    DUMP_CREATE_SPECS,
+    DumpType,
+    validate_create_parameters,
+)
 from dumptool.services.dump_service import DumpService
 
 service = DumpService()
@@ -32,16 +36,7 @@ def list_dumps(filter_type):
 def create_dump(dump_type, error_id, failing_id):
     try:
         dump_type = DumpType(dump_type)
-
-        # Hardware requires Error ID
-        if dump_type == DumpType.HARDWARE and error_id is None:
-            print("✖ Hardware dump requires --error-id")
-            return
-
-        # SBE requires Failing ID
-        if dump_type == DumpType.SBE and failing_id is None:
-            print("✖ SBE dump requires --failing-id")
-            return
+        validate_create_parameters(dump_type, error_id, failing_id)
 
         result = service.create_dump(
             dump_type,
@@ -49,8 +44,7 @@ def create_dump(dump_type, error_id, failing_id):
             failing_unit_id=failing_id,
         )
 
-        # Extract dump ID from returned object path
-        dump_id = result.split("/")[-1].replace('"', "").replace("'", "")
+        dump_id = result.rsplit("/", 1)[-1]
 
         print("✔ Dump created successfully")
         print(f"Dump ID : {dump_id}")
@@ -108,9 +102,9 @@ Examples:
   dumptool list --type sbe
 
   dumptool create --type bmc
-  dumptool create --type hostboot
-  dumptool create --type hardware --error-id <ERROR_ID>
-  dumptool create --type sbe --failing-id <FAILING_UNIT_ID>
+  dumptool create --type hostboot --error-id <ERROR_ID>
+  dumptool create --type hardware --error-id <ERROR_ID> --failing-id <FAILING_UNIT_ID>
+  dumptool create --type sbe --error-id <ERROR_ID> --failing-id <FAILING_UNIT_ID>
 
   dumptool get-info <DUMP_ID>
   dumptool delete <DUMP_ID>
@@ -157,25 +151,20 @@ Placeholders:
     create_parser.add_argument(
         "--type",
         required=True,
-        choices=[
-            "bmc",
-            "hostboot",
-            "hardware",
-            "sbe",
-        ],
+        choices=[dump_type.value for dump_type in DUMP_CREATE_SPECS],
         help="Type of dump to create.",
     )
 
     create_parser.add_argument(
         "--error-id",
         type=lambda x: int(x, 0),
-        help="Error Log ID (required for hardware, optional for hostboot and sbe).",
+        help="Error Log ID (required for hostboot, hardware, and sbe).",
     )
 
     create_parser.add_argument(
         "--failing-id",
-        type=int,
-        help="Failing Unit ID (required for sbe, optional for hardware).",
+        type=lambda x: int(x, 0),
+        help="Failing Unit ID (required for hardware and sbe).",
     )
 
     # ---------------- DELETE ----------------

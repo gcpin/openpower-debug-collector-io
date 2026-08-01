@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+from typing import Dict, Optional
 
 
 class DumpType(Enum):
@@ -37,6 +37,65 @@ class DumpType(Enum):
             return DumpType.FAULTLOG
         else:
             raise ValueError("Unknown dump type")
+
+
+@dataclass(frozen=True)
+class DumpCreateSpec:
+    dbus_type: Optional[str]
+    requires_error_log_id: bool = False
+    requires_failing_unit_id: bool = False
+
+
+DUMP_CREATE_SPECS: Dict[DumpType, DumpCreateSpec] = {
+    DumpType.BMC: DumpCreateSpec(dbus_type=None),
+    DumpType.HOSTBOOT: DumpCreateSpec(
+        dbus_type="Hostboot",
+        requires_error_log_id=True,
+    ),
+    DumpType.HARDWARE: DumpCreateSpec(
+        dbus_type="Hardware",
+        requires_error_log_id=True,
+        requires_failing_unit_id=True,
+    ),
+    DumpType.SBE: DumpCreateSpec(
+        dbus_type="SBE",
+        requires_error_log_id=True,
+        requires_failing_unit_id=True,
+    ),
+}
+
+
+def validate_create_parameters(
+    dump_type: DumpType,
+    error_log_id: Optional[int],
+    failing_unit_id: Optional[int],
+) -> None:
+    """Validate a dump request against the dump manager contract."""
+    spec = DUMP_CREATE_SPECS.get(dump_type)
+    if spec is None:
+        raise ValueError(
+            f"Dump type '{dump_type.value}' cannot be created by dumptool"
+        )
+
+    if spec.requires_error_log_id and error_log_id is None:
+        raise ValueError(f"{dump_type.value} dump requires --error-id")
+
+    if spec.requires_failing_unit_id and failing_unit_id is None:
+        raise ValueError(f"{dump_type.value} dump requires --failing-id")
+
+    if not spec.requires_error_log_id and error_log_id is not None:
+        raise ValueError(f"{dump_type.value} dump does not accept --error-id")
+
+    if not spec.requires_failing_unit_id and failing_unit_id is not None:
+        raise ValueError(f"{dump_type.value} dump does not accept --failing-id")
+
+    max_uint64 = (1 << 64) - 1
+    for option, value in (
+        ("--error-id", error_log_id),
+        ("--failing-id", failing_unit_id),
+    ):
+        if value is not None and not 0 <= value <= max_uint64:
+            raise ValueError(f"{option} must be between 0 and {max_uint64}")
 
 
 @dataclass
