@@ -50,9 +50,7 @@ class StructuredOutputTests(unittest.TestCase):
 
     @patch.object(cli.service, "create_dump")
     def test_create_json_reports_requested_entry(self, create):
-        create.return_value = (
-            "/xyz/openbmc_project/dump/system/entry/00000001"
-        )
+        create.return_value = "/xyz/openbmc_project/dump/system/entry/00000001"
         output = io.StringIO()
 
         with contextlib.redirect_stdout(output):
@@ -116,9 +114,7 @@ class WaitTests(unittest.TestCase):
     @patch.object(cli.service, "wait_for_dump")
     @patch.object(cli.service, "create_dump")
     def test_create_wait_returns_completed_json(self, create, wait):
-        create.return_value = (
-            "/xyz/openbmc_project/dump/system/entry/00000001"
-        )
+        create.return_value = "/xyz/openbmc_project/dump/system/entry/00000001"
         wait.return_value = make_info("00000001", 10)
         output = io.StringIO()
 
@@ -137,22 +133,20 @@ class WaitTests(unittest.TestCase):
         wait.assert_called_once_with(
             "00000001",
             5,
-            object_path=(
-                "/xyz/openbmc_project/dump/system/entry/00000001"
-            ),
+            object_path=("/xyz/openbmc_project/dump/system/entry/00000001"),
         )
 
     @patch.object(cli.service, "wait_for_dump")
     @patch.object(cli.service, "create_dump")
     def test_create_wait_returns_failure_for_failed_dump(self, create, wait):
-        create.return_value = (
-            "/xyz/openbmc_project/dump/system/entry/00000001"
-        )
+        create.return_value = "/xyz/openbmc_project/dump/system/entry/00000001"
         wait.return_value = make_info("00000001", 10, "Failed")
         stdout = io.StringIO()
         stderr = io.StringIO()
 
-        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(
+            stderr
+        ):
             status = cli.create_dump(
                 "hardware",
                 42,

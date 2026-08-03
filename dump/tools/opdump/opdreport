@@ -120,22 +120,22 @@ function initialize() {
 # @brief Collect boot-failure dump from pre-collected files
 function collect_bootfail_dump() {
     local dump_outpath="$1"
-    
+
     # Boot-failure path: copy pre-collected files
     echo "Packaging boot-failure dump from $boot_failure_path"
     if [ ! -d "$boot_failure_path" ]; then
         echo "Error: Boot-failure path does not exist: $boot_failure_path"
         return "$INTERNAL_FAILURE"
     fi
-    
+
     # Copy all files from source to destination
     if ! cp -r "$boot_failure_path"/* "$dump_outpath/"; then
         echo "Error: Failed to copy files from $boot_failure_path"
         return "$INTERNAL_FAILURE"
     fi
-    
+
     echo "Successfully copied boot-failure dump files"
-    
+
     # Clean up the source directory after successful copy
     # Only remove the specific directory, not the parent /tmp/sppe_dump
     echo "Cleaning up source directory: $boot_failure_path"
@@ -143,7 +143,7 @@ function collect_bootfail_dump() {
         echo "Warning: Failed to clean up source directory $boot_failure_path"
         # Non-fatal, continue with dump packaging
     fi
-    
+
     return "$SUCCESS"
 }
 

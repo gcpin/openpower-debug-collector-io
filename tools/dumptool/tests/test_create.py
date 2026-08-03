@@ -38,14 +38,18 @@ class CreateParameterTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "does not accept --error-id"):
             validate_create_parameters(DumpType.BMC, 1, None)
 
-        with self.assertRaisesRegex(ValueError, "does not accept --failing-id"):
+        with self.assertRaisesRegex(
+            ValueError, "does not accept --failing-id"
+        ):
             validate_create_parameters(DumpType.HOSTBOOT, 1, 2)
 
     def test_ids_must_fit_uint64(self):
         with self.assertRaisesRegex(ValueError, "--error-id must be between"):
             validate_create_parameters(DumpType.HOSTBOOT, -1, None)
 
-        with self.assertRaisesRegex(ValueError, "--failing-id must be between"):
+        with self.assertRaisesRegex(
+            ValueError, "--failing-id must be between"
+        ):
             validate_create_parameters(DumpType.SBE, 1, 1 << 64)
 
 
@@ -82,7 +86,9 @@ class CreateCommandTests(unittest.TestCase):
 
         command = run.call_args.args[0]
         self.assertEqual(command[7], "2")
-        self.assertNotIn("com.ibm.Dump.Create.CreateParameters.FailingUnitId", command)
+        self.assertNotIn(
+            "com.ibm.Dump.Create.CreateParameters.FailingUnitId", command
+        )
 
     @patch("dumptool.clients.dbus_client.subprocess.run")
     def test_bmc_uses_empty_parameter_map(self, run):
@@ -98,7 +104,9 @@ class CreateCommandTests(unittest.TestCase):
 
     @patch("dumptool.clients.dbus_client.subprocess.run")
     def test_invalid_create_response_is_rejected(self, run):
-        run.return_value = subprocess.CompletedProcess([], 0, "unexpected\n", "")
+        run.return_value = subprocess.CompletedProcess(
+            [], 0, "unexpected\n", ""
+        )
 
         with self.assertRaisesRegex(RuntimeError, "invalid object path"):
             DBusClient().create_dump(DumpType.BMC)

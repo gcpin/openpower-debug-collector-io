@@ -2,10 +2,10 @@
 
 import argparse
 import json
-from pathlib import Path
 import platform
 import shutil
 import sys
+from pathlib import Path
 
 from dumptool import __version__
 from dumptool.clients.dbus_client import DBusError
@@ -34,9 +34,11 @@ def _select_dumps(dumps, filter_type, sort_by, reverse, latest):
 
     if latest is not None:
         selected.sort(
-            key=lambda dump: dump.started_time_us
-            if dump.started_time_us is not None
-            else -1,
+            key=lambda dump: (
+                dump.started_time_us
+                if dump.started_time_us is not None
+                else -1
+            ),
             reverse=True,
         )
         selected = selected[:latest]
@@ -48,12 +50,12 @@ def _select_dumps(dumps, filter_type, sort_by, reverse, latest):
         "id": lambda dump: dump.id,
         "type": lambda dump: dump.final_type,
         "size": lambda dump: dump.size if dump.size is not None else -1,
-        "start": lambda dump: dump.started_time_us
-        if dump.started_time_us is not None
-        else -1,
-        "end": lambda dump: dump.ended_time_us
-        if dump.ended_time_us is not None
-        else -1,
+        "start": lambda dump: (
+            dump.started_time_us if dump.started_time_us is not None else -1
+        ),
+        "end": lambda dump: (
+            dump.ended_time_us if dump.ended_time_us is not None else -1
+        ),
         "status": lambda dump: dump.status,
     }
     if sort_by:
@@ -169,7 +171,9 @@ def _print_dump_info(info):
     print(f"Offloaded    : {info.offloaded}")
     print(f"Offload URI  : {info.offload_uri or 'N/A'}")
     if info.error_log_id is not None:
-        print(f"Error Log ID : 0x{info.error_log_id:08X} ({info.error_log_id})")
+        print(
+            f"Error Log ID : 0x{info.error_log_id:08X} ({info.error_log_id})"
+        )
     if info.failing_unit_id is not None:
         print(f"Failing Unit : {info.failing_unit_id}")
     if info.sbe_dump_trigger_type is not None:
@@ -231,20 +235,21 @@ def _positive_number(value):
     try:
         number = int(value, 0)
     except ValueError as error:
-        raise argparse.ArgumentTypeError("must be a positive integer") from error
+        raise argparse.ArgumentTypeError(
+            "must be a positive integer"
+        ) from error
     if number <= 0:
         raise argparse.ArgumentTypeError("must be a positive integer")
     return number
 
 
 def build_parser():
-    description = f"""Manage OpenBMC dumps through xyz.openbmc_project.Dump.Manager.
-
-Creation requirements:
-{_create_requirements()}
-
-ERROR_ID must be the real PEL/error-log ID associated with the failure.
-IDs accept decimal or 0x-prefixed hexadecimal notation."""
+    description = (
+        "Manage OpenBMC dumps through xyz.openbmc_project.Dump.Manager.\n"
+        f"\nCreation requirements:\n{_create_requirements()}\n"
+        "\nERROR_ID must be the real PEL/error-log ID associated with the"
+        " failure.\nIDs accept decimal or 0x-prefixed hexadecimal notation."
+    )
 
     parser = argparse.ArgumentParser(
         prog="dumptool",
@@ -276,8 +281,8 @@ Run 'dumptool <command> --help' for command-specific guidance.""",
         "list",
         help="List available dumps",
         description=(
-            "List dump entries. The system filter includes hostboot, hardware, "
-            "SBE, memory-buffer SBE, resource, and generic system entries."
+            "List dump entries. The system filter includes hostboot, hardware,"
+            " SBE, memory-buffer SBE, resource, and generic system entries."
         ),
         epilog="Examples:\n  dumptool list\n  dumptool list --type sbe",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -340,8 +345,8 @@ for diagnostic correlation data.""",
         type=lambda value: int(value, 0),
         metavar="PEL_ID",
         help=(
-            "Associated PEL/error-log ID in decimal or 0x-prefixed hexadecimal "
-            "notation. Required for hostboot, hardware, and sbe."
+            "Associated PEL/error-log ID in decimal or 0x-prefixed"
+            " hexadecimal notation. Required for hostboot, hardware, and sbe."
         ),
     )
     create_parser.add_argument(
@@ -349,8 +354,8 @@ for diagnostic correlation data.""",
         type=lambda value: int(value, 0),
         metavar="UNIT_ID",
         help=(
-            "Failing unit's FAPI position in decimal or 0x-prefixed hexadecimal "
-            "notation. Required for hardware and sbe."
+            "Failing unit's FAPI position in decimal or 0x-prefixed"
+            " hexadecimal notation. Required for hardware and sbe."
         ),
     )
     create_parser.add_argument(
@@ -375,22 +380,25 @@ for diagnostic correlation data.""",
         "delete",
         help="Delete a dump",
         description=(
-            "Delete one dump entry and its associated dump data. The operation "
-            "cannot be undone."
+            "Delete one dump entry and its associated dump data."
+            " The operation cannot be undone."
         ),
     )
     delete_parser.add_argument(
         "dump_id",
         metavar="DUMP_ID",
-        help="Dump ID to delete; use the exact ID displayed by 'dumptool list'.",
+        help=(
+            "Dump ID to delete; use the exact ID displayed by"
+            " 'dumptool list'."
+        ),
     )
 
     info_parser = subparsers.add_parser(
         "get-info",
         help="Show dump information",
         description=(
-            "Display status, size, timestamps, object path, offload state, and "
-            "available dump-type-specific diagnostic fields."
+            "Display status, size, timestamps, object path, offload state,"
+            " and available dump-type-specific diagnostic fields."
         ),
     )
     info_parser.add_argument(
@@ -409,8 +417,9 @@ for diagnostic correlation data.""",
         "doctor",
         help="Check installation and D-Bus readiness",
         description=(
-            "Print the loaded module path, versions, supported creation types, "
-            "busctl location, and dump-manager reachability. No state is changed."
+            "Print the loaded module path, versions, supported creation"
+            " types, busctl location, and dump-manager reachability."
+            " No state is changed."
         ),
     )
 

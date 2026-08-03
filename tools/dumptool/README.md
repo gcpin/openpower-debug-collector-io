@@ -61,12 +61,12 @@ runtime validation.
 
 Creation parameters are deliberately strict:
 
-| Type | Required parameters |
-| --- | --- |
-| `bmc` | None |
-| `hostboot` | `--error-id` |
+| Type       | Required parameters             |
+| ---------- | ------------------------------- |
+| `bmc`      | None                            |
+| `hostboot` | `--error-id`                    |
 | `hardware` | `--error-id` and `--failing-id` |
-| `sbe` | `--error-id` and `--failing-id` |
+| `sbe`      | `--error-id` and `--failing-id` |
 
 `--error-id` is the real PEL/error-log ID associated with the failure. Do not
 use illustrative values such as `0xDEADBEEF` for a real diagnostic dump.
@@ -91,8 +91,8 @@ dumptool create --type sbe \
     --failing-id 1
 ```
 
-The command returns after the dump manager accepts the request. Add `--wait`
-to wait for `Completed`, `Failed`, or `Aborted`:
+The command returns after the dump manager accepts the request. Add `--wait` to
+wait for `Completed`, `Failed`, or `Aborted`:
 
 ```bash
 dumptool create --type hardware \
@@ -102,9 +102,9 @@ dumptool create --type hardware \
     --timeout 600
 ```
 
-The default wait timeout is 300 seconds. `--timeout` is rejected unless
-`--wait` is also specified. A failed, aborted, or timed-out collection returns
-a nonzero exit status.
+The default wait timeout is 300 seconds. `--timeout` is rejected unless `--wait`
+is also specified. A failed, aborted, or timed-out collection returns a nonzero
+exit status.
 
 For machine-readable output:
 
@@ -170,11 +170,11 @@ The command reports success only after the D-Bus `Delete` method succeeds.
 
 ## Exit status
 
-| Status | Meaning |
-| --- | --- |
-| `0` | Operation succeeded |
-| `1` | D-Bus, timeout, collection, or other operational failure |
-| `2` | Invalid command combination or dump request |
+| Status | Meaning                                                  |
+| ------ | -------------------------------------------------------- |
+| `0`    | Operation succeeded                                      |
+| `1`    | D-Bus, timeout, collection, or other operational failure |
+| `2`    | Invalid command combination or dump request              |
 
 Errors are written to stderr. Successful JSON remains isolated on stdout for
 scripts.

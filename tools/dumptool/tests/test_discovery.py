@@ -11,14 +11,17 @@ from dumptool.models import DumpInfo, DumpType
 
 class DiscoveryTests(unittest.TestCase):
     @patch("dumptool.clients.dbus_client.subprocess.run")
-    def test_tree_parsing_is_exact_deduplicated_and_forward_compatible(self, run):
+    def test_tree_parsing_is_exact_deduplicated_and_forward_compatible(
+        self, run
+    ):
         run.return_value = subprocess.CompletedProcess(
             [],
             0,
             "\n".join(
                 (
                     "├─ /xyz/openbmc_project/dump/system/entry/20000001",
-                    "├─ /xyz/openbmc_project/dump/system/entry/20000001/child",
+                    "├─ /xyz/openbmc_project/dump/system"
+                    "/entry/20000001/child",
                     "├─ /xyz/openbmc_project/dump/future/entry/vendor-id",
                     "└─ /xyz/openbmc_project/not_dump/entry/1",
                 )
@@ -45,13 +48,14 @@ class DumpInfoTests(unittest.TestCase):
             "StartTime": "t 1000000",
             "CompletedTime": "t 2000000",
             "Status": (
-                's "xyz.openbmc_project.Common.Progress.OperationStatus.Failed"'
+                's "xyz.openbmc_project.Common.Progress'
+                '.OperationStatus.Failed"'
             ),
             "ErrorLogId": "t 42",
             "FailingUnitId": "t 7",
             "DumpFilesPath": 's "/run/boot-failure"',
             "SBEDumpTriggerType": (
-                's "com.ibm.Dump.Create.SBEDumpTriggerType.BootFailure"'
+                's "com.ibm.Dump.Create' '.SBEDumpTriggerType.BootFailure"'
             ),
         }
         return values[command[-1]]

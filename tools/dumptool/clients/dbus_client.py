@@ -37,7 +37,8 @@ class DBusClient:
             )
         except FileNotFoundError as error:
             raise DBusError(
-                "busctl was not found; install systemd busctl before using dumptool"
+                "busctl was not found; install systemd busctl before"
+                " using dumptool"
             ) from error
         except subprocess.TimeoutExpired as error:
             raise DBusError(
@@ -132,8 +133,14 @@ class DBusClient:
             cmd.extend((key, signature, value))
 
         output = shlex.split(self._run_busctl(cmd, "Create dump"))
-        if len(output) != 2 or output[0] != "o" or not output[1].startswith("/"):
-            raise DBusError("Create dump failed: invalid object path in response")
+        if (
+            len(output) != 2
+            or output[0] != "o"
+            or not output[1].startswith("/")
+        ):
+            raise DBusError(
+                "Create dump failed: invalid object path in response"
+            )
 
         return output[1]
 

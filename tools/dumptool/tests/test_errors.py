@@ -39,19 +39,21 @@ class DBusErrorTests(unittest.TestCase):
         )
 
         with self.assertRaisesRegex(DBusError, "Delete is not allowed"):
-            DBusClient().delete_dump(
-                "/xyz/openbmc_project/dump/bmc/entry/1"
-            )
+            DBusClient().delete_dump("/xyz/openbmc_project/dump/bmc/entry/1")
 
 
 class CLIExitCodeTests(unittest.TestCase):
     @patch.object(cli.service, "create_dump")
     def test_dbus_failure_returns_one_and_uses_stderr(self, create):
-        create.side_effect = DBusError("Create dump failed: service unavailable")
+        create.side_effect = DBusError(
+            "Create dump failed: service unavailable"
+        )
         stdout = io.StringIO()
         stderr = io.StringIO()
 
-        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(
+            stderr
+        ):
             status = cli.main(
                 [
                     "create",
@@ -70,7 +72,9 @@ class CLIExitCodeTests(unittest.TestCase):
         stdout = io.StringIO()
         stderr = io.StringIO()
 
-        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(
+            stderr
+        ):
             status = cli.main(["create", "--type", "hostboot"])
 
         self.assertEqual(status, 2)
@@ -83,7 +87,9 @@ class CLIExitCodeTests(unittest.TestCase):
         stdout = io.StringIO()
         stderr = io.StringIO()
 
-        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(
+            stderr
+        ):
             status = cli.main(["delete", "1"])
 
         self.assertEqual(status, 1)

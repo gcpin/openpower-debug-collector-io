@@ -89,7 +89,9 @@ def validate_create_parameters(
         raise ValueError(f"{dump_type.value} dump does not accept --error-id")
 
     if not spec.requires_failing_unit_id and failing_unit_id is not None:
-        raise ValueError(f"{dump_type.value} dump does not accept --failing-id")
+        raise ValueError(
+            f"{dump_type.value} dump does not accept --failing-id"
+        )
 
     max_uint64 = (1 << 64) - 1
     for option, value in (

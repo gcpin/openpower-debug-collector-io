@@ -88,10 +88,7 @@ if phal_backend == 'next'
     )
 
     dumptool_test_env = environment()
-    dumptool_test_env.set(
-        'PYTHONPATH',
-        meson.current_source_dir() / 'tools',
-    )
+    dumptool_test_env.set('PYTHONPATH', meson.current_source_dir() / 'tools')
     dumptool_test_env.set('PYTHONDONTWRITEBYTECODE', '1')
     test(
         'dumptool-unit-tests',

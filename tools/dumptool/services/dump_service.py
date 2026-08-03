@@ -59,7 +59,9 @@ class DumpService:
 
         if object_path is None:
             dumps = self.client.list_dumps()
-            dump = next((entry for entry in dumps if entry.id == dump_id), None)
+            dump = next(
+                (entry for entry in dumps if entry.id == dump_id), None
+            )
             if not dump:
                 raise ValueError(f"Dump ID {dump_id} not found")
             object_path = dump.object_path
@@ -73,7 +75,8 @@ class DumpService:
             if remaining <= 0:
                 unit = "second" if timeout == 1 else "seconds"
                 raise DumpWaitTimeout(
-                    f"Dump {dump_id} did not complete within {timeout:g} {unit}"
+                    f"Dump {dump_id} did not complete within"
+                    f" {timeout:g} {unit}"
                 )
 
             time.sleep(min(poll_interval, remaining))
