@@ -4,7 +4,7 @@ project(
     meson_version: '>=1.1.1',
     default_options: ['warning_level=3', 'werror=true', 'cpp_std=c++23'],
     license: 'Apache-2.0',
-    version: '1.0.0',
+    version: '1.1.0',
 )
 
 cxx = meson.get_compiler('cpp')
@@ -67,11 +67,13 @@ if phal_backend == 'next'
 
     python.install_sources(
         'tools/dumptool/clients/dbus_client.py',
+        'tools/dumptool/clients/__init__.py',
         subdir: 'dumptool/clients',
     )
 
     python.install_sources(
         'tools/dumptool/services/dump_service.py',
+        'tools/dumptool/services/__init__.py',
         subdir: 'dumptool/services',
     )
 
@@ -83,6 +85,24 @@ if phal_backend == 'next'
         install: true,
         install_dir: get_option('bindir'),
         install_mode: 'rwxr-xr-x',
+    )
+
+    dumptool_test_env = environment()
+    dumptool_test_env.set('PYTHONPATH', meson.current_source_dir() / 'tools')
+    dumptool_test_env.set('PYTHONDONTWRITEBYTECODE', '1')
+    test(
+        'dumptool-unit-tests',
+        python,
+        args: [
+            '-m',
+            'unittest',
+            'discover',
+            '-s',
+            meson.current_source_dir() / 'tools/dumptool/tests',
+            '-v',
+        ],
+        env: dumptool_test_env,
+        suite: 'dumptool',
     )
 endif
 

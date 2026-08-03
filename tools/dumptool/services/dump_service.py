@@ -1,7 +1,12 @@
+import time
 from typing import List
 
 from dumptool.clients.dbus_client import DBusClient
 from dumptool.models import DumpInfo, DumpType
+
+
+class DumpWaitTimeout(RuntimeError):
+    """A dump did not reach a terminal state within the requested timeout."""
 
 
 class DumpService:
@@ -42,3 +47,36 @@ class DumpService:
             raise ValueError(f"Dump ID {dump_id} not found")
 
         return self.client.get_dump_info(dump.object_path)
+
+    def wait_for_dump(
+        self,
+        dump_id: str,
+        timeout: float,
+        poll_interval: float = 1.0,
+        object_path=None,
+    ) -> DumpInfo:
+        deadline = time.monotonic() + timeout
+
+        if object_path is None:
+            dumps = self.client.list_dumps()
+            dump = next(
+                (entry for entry in dumps if entry.id == dump_id), None
+            )
+            if not dump:
+                raise ValueError(f"Dump ID {dump_id} not found")
+            object_path = dump.object_path
+
+        while True:
+            info = self.client.get_dump_info(object_path)
+            if info.is_terminal:
+                return info
+
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                unit = "second" if timeout == 1 else "seconds"
+                raise DumpWaitTimeout(
+                    f"Dump {dump_id} did not complete within"
+                    f" {timeout:g} {unit}"
+                )
+
+            time.sleep(min(poll_interval, remaining))
