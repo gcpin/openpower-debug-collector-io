@@ -50,6 +50,9 @@ class DumpCreateSpec:
 
 DUMP_CREATE_SPECS: Dict[DumpType, DumpCreateSpec] = {
     DumpType.BMC: DumpCreateSpec(dbus_type=None),
+    DumpType.SYSTEM: DumpCreateSpec(
+        dbus_type="System",
+    ),
     DumpType.HOSTBOOT: DumpCreateSpec(
         dbus_type="Hostboot",
         requires_error_log_id=True,
