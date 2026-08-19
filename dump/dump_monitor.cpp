@@ -504,7 +504,7 @@ void DumpMonitor::updateProgressStatus(const std::string& path,
 }
 
 void DumpMonitor::startMpReboot(
-    const sdbusplus::message::object_path& objectPath)
+    const sdbusplus::message::object_path& objectPath [[maybe_unused]])
 {
     constexpr auto systemdService = "org.freedesktop.systemd1";
     constexpr auto systemdObjPath = "/org/freedesktop/systemd1";
@@ -523,7 +523,13 @@ void DumpMonitor::startMpReboot(
     catch (const sdbusplus::exception_t& e)
     {
         lg2::error("Failed to start memory preserving reboot");
+#if 0
+        // Disabled during testing: do not mark the dump entry as Failed
+        // when the MPIPL reboot cannot be triggered.  The entry stays
+        // InProgress so the inotify watch on tmp/ can still pick up the
+        // raw dump file if it arrives via another path.
         updateProgressStatus(objectPath, dumpStatusFailed);
+#endif
     }
 }
 
