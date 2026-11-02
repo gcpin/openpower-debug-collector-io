@@ -790,6 +790,25 @@ function package_staged_dump() {
         dump_prefix="SYSDUMP"
     fi
 
+    # A resource dump is named with the time stamp that the host wrote in the
+    # Dump File Name field of the raw header
+    # (RSCDUMP.<serial>.<host dump id>.<YYYYMMDDhhmmss>).  The dump id in the
+    # name stays the BMC entry id, the dump manager matches the file to its
+    # entry with it.  If the time stamp is missing or malformed, the current
+    # time is used.
+    if [[ "$dump_prefix" == "RSCDUMP" ]]; then
+        local raw_name host_ts
+        raw_name=$(dd if="$staged_src" bs=1 skip=24 count=40 2>/dev/null |
+            tr -d '\000')
+        host_ts="${raw_name##*.}"
+        if [[ "$host_ts" =~ ^[0-9]{14}$ ]]; then
+            dDay="$host_ts"
+        else
+            echo "package_staged_dump: no valid time stamp in raw header" \
+                "name '$raw_name', using current time $dDay"
+        fi
+    fi
+
     local dump_name="${dump_prefix}.${serialNo}.${dump_id}.${dDay}"
 
     # Create the per-dump subdirectory: opdump/<dump_id>/
@@ -803,17 +822,27 @@ function package_staged_dump() {
         return 1
     fi
 
-    # Build reassembled dump directly into dest_dir.
-    # Writing here triggers IN_CLOSE_WRITE on the child watch →
-    # updateEntry() → entry Completed.
     local out_file="${dest_dir}/${dump_name}"
-    build_staged_dump_header "$staged_src" "$out_file" "$dump_name"
-    local rc=$?
+    local rc
+    if [[ "$dump_prefix" == "RSCDUMP" ]]; then
+        # A resource dump is formatted completely by the host.  Neither its
+        # header nor any of its data may be modified, the staged file is only
+        # renamed into place.  The rename triggers IN_MOVED_TO on the child
+        # watch → updateEntry() → entry Completed.
+        mv -f "$staged_src" "$out_file"
+        rc=$?
+    else
+        # MPIPL system dump: build reassembled dump directly into dest_dir.
+        # Writing here triggers IN_CLOSE_WRITE on the child watch →
+        # updateEntry() → entry Completed.
+        build_staged_dump_header "$staged_src" "$out_file" "$dump_name"
+        rc=$?
+    fi
 
     rm -f "$staged_src"
 
     if [[ $rc -ne 0 ]]; then
-        echo "package_staged_dump: build_staged_dump_header failed rc=$rc"
+        echo "package_staged_dump: packaging $dump_prefix failed rc=$rc"
         rm -f "$out_file"
         # Do not leave an empty dump directory behind; rmdir only removes an
         # empty directory so nothing else can be lost.
